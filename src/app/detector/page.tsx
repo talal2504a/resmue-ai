@@ -8,10 +8,28 @@ import { useToast } from "@/context/ToastContext";
 export default function DetectorPage() {
   const [result, setResult] = useState<{ score: number; indicators: string[]; recommendations: string } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [manualText, setManualText] = useState("");
   const { addToast } = useToast();
 
   const handleUpload = async (text: string) => {
+    if (!text.trim()) {
+      addToast("No text found in file. Try a text-based PDF, DOCX, or paste text manually below.", "error");
+      return;
+    }
+    await analyzeText(text);
+  };
+
+  const handleManualAnalyze = async () => {
+    if (!manualText.trim()) {
+      addToast("Please enter some text to analyze.", "error");
+      return;
+    }
+    await analyzeText(manualText);
+  };
+
+  const analyzeText = async (text: string) => {
     setIsAnalyzing(true);
+    setResult(null);
     try {
       const response = await fetch("/api/detect", {
         method: "POST",
@@ -19,10 +37,21 @@ export default function DetectorPage() {
         body: JSON.stringify({ text }),
       });
 
-      if (!response.ok) throw new Error("Detection failed");
-
       const data = await response.json();
+
+      if (!response.ok) {
+        const errorMessage = data.detail || data.error || "Detection failed";
+        addToast(errorMessage, "error");
+        return;
+      }
+
+      if (data.error) {
+        addToast(data.detail || data.error, "error");
+        return;
+      }
+
       setResult(data);
+      addToast("Analysis complete!", "success");
     } catch (error) {
       console.error("Error:", error);
       addToast("Failed to analyze resume. Please try again.", "error");
@@ -62,6 +91,25 @@ export default function DetectorPage() {
                 <DetectorResult score={result.score} indicators={result.indicators} recommendations={result.recommendations} />
               </div>
             )}
+
+            <div className="mt-8 border-t border-gray-200 pt-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Or paste your resume text here:</h3>
+              <textarea
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+                rows={8}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400 resize-none"
+                placeholder="Paste your resume text here if file upload doesn't work..."
+              />
+              <button
+                type="button"
+                onClick={handleManualAnalyze}
+                disabled={isAnalyzing || !manualText.trim()}
+                className="mt-4 w-full py-3 px-6 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                Analyze Text
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -10,6 +10,10 @@ export async function POST(req: Request) {
   try {
     const { text } = await req.json();
 
+    if (!text || !text.trim()) {
+      return NextResponse.json({ error: 'No text provided', detail: 'Please upload a resume with readable text.' }, { status: 400 });
+    }
+
     const prompt = `
       Analyze the following resume text for AI-generated content indicators.
       
@@ -38,11 +42,20 @@ export async function POST(req: Request) {
     });
 
     const content = response.choices[0].message.content;
-    const result = JSON.parse(content || '{}');
+    if (!content) {
+      return NextResponse.json({ error: 'Empty response from AI', detail: 'The AI returned no analysis. Please try again.' }, { status: 500 });
+    }
 
-    return NextResponse.json(result);
+    try {
+      const result = JSON.parse(content);
+      return NextResponse.json(result);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError, 'Content:', content);
+      return NextResponse.json({ error: 'Invalid AI response', detail: 'Could not parse analysis result. Please try again.' }, { status: 500 });
+    }
   } catch (error) {
     console.error('Error detecting AI content:', error);
-    return NextResponse.json({ error: 'Failed to analyze resume' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to analyze resume';
+    return NextResponse.json({ error: 'Failed to analyze resume', detail: message }, { status: 500 });
   }
 }

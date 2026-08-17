@@ -6,15 +6,32 @@ from supabase import create_client
 
 router = APIRouter()
 
-supabase = create_client(
-    os.getenv("SUPABASE_URL", ""),
-    os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-)
+_supabase = None
+
+def get_supabase():
+    global _supabase
+    if _supabase is None:
+        from supabase import create_client
+        _supabase = create_client(
+            os.getenv("SUPABASE_URL", ""),
+            os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+        )
+    return _supabase
 
 SAFEPAY_API_KEY = os.getenv("SAFEPAY_API_KEY", "")
 SAFEPAY_SECRET_KEY = os.getenv("SAFEPAY_SECRET_KEY", "")
 SAFEPAY_BASE_URL = os.getenv("SAFEPAY_BASE_URL", "https://api.safepay.com/v1")
-SAFEPAY_PLAN_ID = os.getenv("SAFEPAY_PLAN_ID", "")
+
+PLAN_MAP = {
+    "pro": {
+        "monthly": os.getenv("SAFEPAY_PLAN_PRO_MONTHLY", ""),
+        "yearly": os.getenv("SAFEPAY_PLAN_PRO_YEARLY", ""),
+    },
+    "business": {
+        "monthly": os.getenv("SAFEPAY_PLAN_BUSINESS_MONTHLY", ""),
+        "yearly": os.getenv("SAFEPAY_PLAN_BUSINESS_YEARLY", ""),
+    },
+}
 
 
 @router.post("/checkout")
@@ -29,6 +46,7 @@ async def create_checkout(request: Request):
             raise HTTPException(status_code=401, detail="User not authenticated")
 
         # Get user email from Supabase
+        supabase = get_supabase()
         user_result = supabase.auth.admin.get_user_by_id(user_id)
         if not user_result.data or not user_result.data.user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -37,11 +55,15 @@ async def create_checkout(request: Request):
         if not user_email:
             raise HTTPException(status_code=400, detail="User email not found")
 
+        plan_id = PLAN_MAP.get(plan, {}).get(billing_cycle)
+        if not plan_id:
+            raise HTTPException(status_code=400, detail=f"No Safepay plan configured for {plan} {billing_cycle}")
+
         # Create Safepay checkout session
         async with httpx.AsyncClient() as client:
             checkout_data = {
                 "email": user_email,
-                "plan_id": SAFEPAY_PLAN_ID,
+                "plan_id": plan_id,
                 "billing_cycle": billing_cycle,
                 "success_url": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/pricing?success=true",
                 "cancel_url": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/pricing?canceled=true",
@@ -62,7 +84,13 @@ async def create_checkout(request: Request):
             )
 
             if response.status_code != 200:
-                raise HTTPException(status_code=response.status_code, detail="Failed to create checkout session")
+                detail = "Failed to create checkout session"
+                try:
+                    error_body = response.json()
+                    detail = error_body.get("message") or error_body.get("detail") or str(error_body)
+                except Exception:
+                    detail = f"Safepay error: {response.status_code} - {response.text[:200]}"
+                raise HTTPException(status_code=response.status_code, detail=detail)
 
             checkout_session = response.json()
 
@@ -74,8 +102,9 @@ async def create_checkout(request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Checkout error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create checkout session")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create checkout session: {str(e)}")
 
 
 @router.post("/webhook")
@@ -103,6 +132,7 @@ async def safepay_webhook(request: Request):
                 }
 
                 # Upsert subscription
+                supabase = get_supabase()
                 supabase.table("subscriptions").upsert(subscription_data).execute()
 
         return JSONResponse({"status": "success"})

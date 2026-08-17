@@ -114,7 +114,7 @@ export default function PricingPage() {
   const router = useRouter();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const { user } = useAuth();
+  const { user, session } = useAuth();
 
   const getPrice = (plan: typeof plans[0]) => {
     if (plan.id === "free") return "$0";
@@ -144,13 +144,20 @@ export default function PricingPage() {
     try {
       const response = await fetch("/api/payment/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+        },
         body: JSON.stringify({ plan: planId, billingCycle }),
       });
 
-      if (!response.ok) throw new Error("Failed to initiate checkout");
-
       const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Failed to initiate checkout");
+        return;
+      }
+
       if (data.checkoutUrl) {
         window.location.assign(data.checkoutUrl);
       }

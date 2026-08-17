@@ -7,10 +7,16 @@ import hmac
 
 router = APIRouter()
 
-supabase = create_client(
-    os.getenv("SUPABASE_URL", ""),
-    os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-)
+_supabase = None
+
+def get_supabase():
+    global _supabase
+    if _supabase is None:
+        _supabase = create_client(
+            os.getenv("SUPABASE_URL", ""),
+            os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+        )
+    return _supabase
 
 WEBHOOK_SECRET = os.getenv("SAFEPAY_WEBHOOK_SECRET", "")
 
@@ -47,6 +53,7 @@ async def safepay_webhook(request: Request):
             billing_cycle = metadata.get("billing_cycle")
 
             if user_id and plan:
+                supabase = get_supabase()
                 subscription_data = {
                     "user_id": user_id,
                     "plan": plan,

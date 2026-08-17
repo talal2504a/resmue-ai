@@ -80,54 +80,70 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.resumes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.job_matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.resume_analyses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for profiles
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 CREATE POLICY "Users can view own profile" ON public.profiles
   FOR SELECT USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile" ON public.profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- RLS Policies for resumes
+DROP POLICY IF EXISTS "Users can view own resumes" ON public.resumes;
 CREATE POLICY "Users can view own resumes" ON public.resumes
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create own resumes" ON public.resumes;
 CREATE POLICY "Users can create own resumes" ON public.resumes
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own resumes" ON public.resumes;
 CREATE POLICY "Users can update own resumes" ON public.resumes
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own resumes" ON public.resumes;
 CREATE POLICY "Users can delete own resumes" ON public.resumes
   FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for job_matches
+DROP POLICY IF EXISTS "Users can view own job matches" ON public.job_matches;
 CREATE POLICY "Users can view own job matches" ON public.job_matches
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create own job matches" ON public.job_matches;
 CREATE POLICY "Users can create own job matches" ON public.job_matches
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own job matches" ON public.job_matches;
 CREATE POLICY "Users can delete own job matches" ON public.job_matches
   FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for resume_analyses
+DROP POLICY IF EXISTS "Users can view own analyses" ON public.resume_analyses;
 CREATE POLICY "Users can view own analyses" ON public.resume_analyses
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create own analyses" ON public.resume_analyses;
 CREATE POLICY "Users can create own analyses" ON public.resume_analyses
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- RLS Policies for subscriptions
+DROP POLICY IF EXISTS "Users can view own subscription" ON public.subscriptions;
 CREATE POLICY "Users can view own subscription" ON public.subscriptions
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own subscription" ON public.subscriptions;
 CREATE POLICY "Users can insert own subscription" ON public.subscriptions
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own subscription" ON public.subscriptions;
 CREATE POLICY "Users can update own subscription" ON public.subscriptions
   FOR UPDATE USING (auth.uid() = user_id);
 

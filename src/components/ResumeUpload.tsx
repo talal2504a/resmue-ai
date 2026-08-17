@@ -8,6 +8,8 @@ interface ResumeUploadProps {
   accept?: string;
 }
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
 export default function ResumeUpload({ onUpload, accept = ".pdf,.docx,.txt,.md,.csv,.json" }: ResumeUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -34,19 +36,6 @@ export default function ResumeUpload({ onUpload, accept = ".pdf,.docx,.txt,.md,.
     }
   }, []);
 
-  const extractPdfText = useCallback(async (file: File): Promise<string> => {
-    try {
-      const pdfParse = (await import('pdf-parse')) as unknown as { PDFParse: new (buffer: Buffer) => { text: string } };
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const parser = new pdfParse.PDFParse(buffer);
-      return parser.text || '';
-    } catch (err) {
-      console.error("PDF extraction error:", err);
-      throw new Error("Failed to read PDF file. The PDF may be image-based or corrupted.");
-    }
-  }, []);
-
   const extractTextFromFile = useCallback(async (file: File): Promise<string> => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
@@ -55,31 +44,62 @@ export default function ResumeUpload({ onUpload, accept = ".pdf,.docx,.txt,.md,.
         return await readFileAsText(file);
       } else if (fileExtension === 'docx') {
         return await extractDocxText(file);
-      } else if (fileExtension === 'pdf') {
-        return await extractPdfText(file);
       } else {
-        return await readFileAsText(file);
+        return "";
       }
     } catch (err) {
       console.error("Text extraction error:", err);
       throw new Error(`Could not extract text from ${file.name}. Please try a different file format.`);
     }
-  }, [extractDocxText, extractPdfText]);
+  }, [extractDocxText]);
 
   const processFile = useCallback(async (file: File) => {
     setFileName(file.name);
     setError("");
 
     try {
-      const text = await extractTextFromFile(file);
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      let text = "";
+
+      if (fileExtension === 'pdf') {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch(`${BACKEND_URL}/api/upload/extract-text`, {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.detail || "Failed to extract text from PDF");
+        }
+
+        if (!data.success || !data.text) {
+          const errorMsg = data.message || `No readable text found in "${file.name}". If this is a scanned/image-based PDF, please use a text-based PDF, DOCX, or paste the text manually.`;
+          setError(errorMsg);
+          onUpload("");
+          return;
+        }
+
+        text = data.text;
+      } else {
+        text = await extractTextFromFile(file);
+      }
+
+      console.log("Extracted text length:", text.length, "from file:", file.name);
+
       if (!text.trim()) {
-        setError("The uploaded file appears to be empty or contains no readable text.");
+        const errorMsg = `No readable text found in "${file.name}". If this is a scanned/image-based PDF, please use a text-based PDF, DOCX, or paste the text manually below.`;
+        setError(errorMsg);
         onUpload("");
       } else {
         onUpload(text);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to process file";
+      console.error("File processing error:", err);
       setError(errorMessage);
       onUpload("");
     }
@@ -164,3 +184,4 @@ export default function ResumeUpload({ onUpload, accept = ".pdf,.docx,.txt,.md,.
     </div>
   );
 }
+
