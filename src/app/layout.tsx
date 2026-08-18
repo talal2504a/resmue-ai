@@ -30,6 +30,9 @@ export const metadata: Metadata = {
     siteName: "ResumeAI",
     type: "website",
   },
+  verification: {
+    google: "kDVCF0cAO3lqhmx73fAo0D-Pd30SFuvPPFK-17KPbCA",
+  },
 };
 
 export const jsonLd = {
