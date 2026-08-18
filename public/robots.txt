@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /login
+Disallow: /signup
+
+Sitemap: https://resume-ai-pi-blue.vercel.app/sitemap.xml

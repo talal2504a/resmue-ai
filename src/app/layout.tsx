@@ -20,6 +20,31 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ResumeAI - AI-Powered Resume Builder",
   description: "Create, analyze, improve, and optimize resumes using AI",
+  alternates: {
+    canonical: "https://resume-ai-pi-blue.vercel.app",
+  },
+  openGraph: {
+    title: "ResumeAI - AI-Powered Resume Builder",
+    description: "Create, analyze, improve, and optimize resumes using AI",
+    url: "https://resume-ai-pi-blue.vercel.app",
+    siteName: "ResumeAI",
+    type: "website",
+  },
+};
+
+export const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ResumeAI",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "url": "https://resume-ai-pi-blue.vercel.app",
+  "description": "AI-powered resume builder, analyzer, and optimizer",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -29,6 +54,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <ToastProvider>
           <AuthProvider>
             <Navbar />
