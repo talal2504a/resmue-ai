@@ -24,6 +24,30 @@ export default function ResumeUpload({ onUpload, accept = ".pdf,.docx,.txt,.md,.
     });
   };
 
+  const extractPdfTextClientSide = useCallback(async (file: File): Promise<string> => {
+    try {
+      const pdfjsLib = await import('pdfjs-dist');
+      const arrayBuffer = await file.arrayBuffer();
+      
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+      
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let text = '';
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items.map((item: { str: string }) => item.str).join(' ');
+        text += pageText + '\n';
+      }
+      
+      return text.trim();
+    } catch (err) {
+      console.error("Client-side PDF extraction error:", err);
+      throw new Error("Failed to extract text from PDF on the client side.");
+    }
+  }, []);
+
   const extractDocxText = useCallback(async (file: File): Promise<string> => {
     try {
       const mammoth = (await import('mammoth')).default;
@@ -62,40 +86,69 @@ export default function ResumeUpload({ onUpload, accept = ".pdf,.docx,.txt,.md,.
       let text = "";
 
       if (fileExtension === 'pdf') {
-        const formData = new FormData();
-        formData.append("file", file);
+        let pdfText = "";
+        let backendFailed = false;
 
-        const response = await fetch(`${BACKEND_URL}/api/upload/extract-text`, {
-          method: "POST",
-          body: formData,
-        });
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
 
-        const data = await response.json();
+          const response = await fetch(`${BACKEND_URL}/api/upload/extract-text`, {
+            method: "POST",
+            body: formData,
+          });
 
-        if (!response.ok) {
-          throw new Error(data.detail || "Failed to extract text from PDF");
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.detail || "Failed to extract text from PDF");
+          }
+
+          if (!data.success || !data.text) {
+            const errorMsg = data.message || `No readable text found in "${file.name}". If this is a scanned/image-based PDF, please use a text-based PDF, DOCX, or paste the text manually.`;
+            setError(errorMsg);
+            onUpload("");
+            return;
+          }
+
+          pdfText = data.text;
+        } catch (err) {
+          backendFailed = true;
+          console.error("Backend PDF extraction failed, trying client-side fallback:", err);
         }
 
-        if (!data.success || !data.text) {
-          const errorMsg = data.message || `No readable text found in "${file.name}". If this is a scanned/image-based PDF, please use a text-based PDF, DOCX, or paste the text manually.`;
+        if (!pdfText && backendFailed) {
+          try {
+            pdfText = await extractPdfTextClientSide(file);
+          } catch (clientErr) {
+            const errorMessage = clientErr instanceof Error ? clientErr.message : "Failed to process PDF file";
+            setError(errorMessage);
+            onUpload("");
+            return;
+          }
+        }
+
+        if (!pdfText.trim()) {
+          const errorMsg = `No readable text found in "${file.name}". If this is a scanned/image-based PDF, please use a text-based PDF, DOCX, or paste the text manually below.`;
           setError(errorMsg);
           onUpload("");
           return;
         }
 
-        text = data.text;
+        console.log("Extracted text length:", pdfText.length, "from file:", file.name);
+        onUpload(pdfText);
       } else {
         text = await extractTextFromFile(file);
-      }
 
-      console.log("Extracted text length:", text.length, "from file:", file.name);
+        console.log("Extracted text length:", text.length, "from file:", file.name);
 
-      if (!text.trim()) {
-        const errorMsg = `No readable text found in "${file.name}". If this is a scanned/image-based PDF, please use a text-based PDF, DOCX, or paste the text manually below.`;
-        setError(errorMsg);
-        onUpload("");
-      } else {
-        onUpload(text);
+        if (!text.trim()) {
+          const errorMsg = `No readable text found in "${file.name}". If this is a scanned/image-based PDF, please use a text-based PDF, DOCX, or paste the text manually below.`;
+          setError(errorMsg);
+          onUpload("");
+        } else {
+          onUpload(text);
+        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to process file";
@@ -103,7 +156,7 @@ export default function ResumeUpload({ onUpload, accept = ".pdf,.docx,.txt,.md,.
       setError(errorMessage);
       onUpload("");
     }
-  }, [onUpload, extractTextFromFile]);
+  }, [onUpload, extractTextFromFile, extractPdfTextClientSide]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
