@@ -8,8 +8,6 @@ interface ResumeUploadProps {
   accept?: string;
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-
 export default function ResumeUpload({ onUpload, accept = ".pdf,.docx,.txt,.md,.csv,.json" }: ResumeUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -93,7 +91,7 @@ export default function ResumeUpload({ onUpload, accept = ".pdf,.docx,.txt,.md,.
           const formData = new FormData();
           formData.append("file", file);
 
-          const response = await fetch(`${BACKEND_URL}/api/upload/extract-text`, {
+          const response = await fetch("/api/upload/extract-text", {
             method: "POST",
             body: formData,
           });
